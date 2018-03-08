@@ -1,0 +1,161 @@
+package server
+
+import (
+	"golang.org/x/net/websocket"
+	"log"
+	"io"
+)
+
+const channelBufSize = 100
+var maxId int = 0
+var peerId = "";
+
+type Talker struct{
+	Id          int `json:"id"`
+	peerId      string `json:"peerId"`
+	ws          *websocket.Conn
+	server      *Server
+	pair 		*Pair
+	ch          chan ResponseMessage
+	doneCh      chan bool
+	addRoomCh chan *Pair
+	delRoomCh chan *Pair
+}
+
+
+func NewTalker(ws *websocket.Conn, server *Server, pair *Pair) *Talker {
+
+	if ws == nil {
+		panic("ws cannot be nil")
+	}
+
+	if server == nil {
+		panic("server cannot be nil")
+	}
+
+	maxId++
+	ch := make(chan ResponseMessage, channelBufSize)
+	doneCh := make(chan bool)
+	addRoomCh := make(chan *Pair)
+	delRoomCh := make(chan *Pair)
+	return &Talker{maxId, peerId, ws, server, pair, ch, doneCh, addRoomCh, delRoomCh}
+}
+
+func (c *Talker) Conn() *websocket.Conn {
+	return c.ws
+}
+
+func (c *Talker) Done() {
+	c.doneCh <- true
+}
+
+// Listen Write and Read request via chanel
+func (c *Talker) Listen() {
+	go c.listenWrite()
+	c.listenRead()
+}
+
+// Listen write request via chanel
+func (c *Talker) listenWrite() {
+	log.Println("Listening write to client")
+	for {
+		select {
+
+		// send message to the client
+		case msg := <-c.ch:
+			log.Println("Send:", msg, c.ws)
+			websocket.JSON.Send(c.ws, msg)
+
+			// receive done request
+		case <-c.doneCh:
+			c.server.Del(c)
+			c.doneCh <- true // for listenRead method
+			return
+
+			// case r := <-c.addRoomCh:
+			// 	log.Println("add room to client")
+			// 	c.room = r
+			// 	msg := ResponseMessage{Action: actionCreateRoom, Status: "OK", Code: 200}
+			// 	websocket.JSON.Send(c.ws, msg)
+			//
+			// msg := ClientGreetingResponse{"grabing", "ROOM create hello:)"}
+			// websocket.JSON.Send(c.ws, msg)
+
+		}
+
+	}
+}
+
+
+// Listen read request via chanel
+func (c *Talker) listenRead() {
+	log.Println("Listening read from client")
+	for {
+		select {
+
+		// receive done request
+		case <-c.doneCh:
+			c.server.Del(c)
+			c.doneCh <- true // for listenWrite method
+			return
+
+			// read data from websocket connection
+		default:
+			var msg RequestMessage
+			err := websocket.JSON.Receive(c.ws, &msg)
+			if err == io.EOF {
+				c.doneCh <- true
+			} else if err != nil {
+				c.server.Err(err)
+			}
+			log.Println(msg)
+			switch msg.Action {
+
+			////отправка сообщений
+			//case actionSendMessage:
+			//	log.Println(actionSendMessage)
+			//	var message Message
+			//	err := json.Unmarshal(msg.Body, &message)
+			//	if !CheckError(err, "Invalid RawData"+string(msg.Body), false) {
+			//		msg := ResponseMessage{Action: actionSendMessage, Status: "Invalid Request", Code: 403}
+			//		c.ch <- msg
+			//	}
+			//	if c.room != nil {
+			//		message.Author = "client"
+			//		message.Room = c.room.Id
+			//		message.Time = int(time.Now().Unix())
+			//		c.room.channelForMessage <- message
+			//	} else {
+			//		msg := ResponseMessage{Action: actionSendMessage, Status: "Room not found", Code: 404}
+			//		c.ch <- msg
+			//	}
+			//
+			//	//описание комнаты
+			//case actionSendDescriptionRoom:
+			//	log.Println(actionSendDescriptionRoom)
+			//	var roomDescription ClientSendDescriptionRoomRequest
+			//	err := json.Unmarshal(msg.Body, &roomDescription)
+			//	if !CheckError(err, "Invalid RawData"+string(msg.Body), false) {
+			//		msg := ResponseMessage{Action: actionSendDescriptionRoom, Status: "Invalid Request", Code: 403}
+			//		c.ch <- msg
+			//	} else {
+			//		c.room.channelForDescription <- roomDescription
+			//	}
+			//
+			//	//закрытие комнаты
+			//case actionCloseRoom:
+			//	log.Println(actionCloseRoom)
+			//	c.room.Status = roomClose
+			//	c.room.channelForStatus <- roomClose
+			//
+			//	//получение всех сообщений
+			//case actionGetAllMessages:
+			//	log.Println(actionGetAllMessages)
+			//	messages, _ := json.Marshal(c.room.Messages)
+			//	response := ResponseMessage{Action: actionGetAllMessages, Status: "OK", Code: 200, Body: messages}
+			//	log.Println(response)
+			//	c.ch <- response
+			}
+		}
+	}
+}
