@@ -9,6 +9,10 @@ const (
 	actionSendMessage       = "sendMessage"
 	actionGetAllMessages    = "getAllMessages"
 	actionCloseRoom         = "closeRoom"
+	actionToken				= "token"
+	initMessage 			= "init"
+	initMessage2 			= "init2"
+	actionGetTest			= "getTest"
 	actionChangeStatusRooms = "changeStatusRoom"
 )
 
@@ -17,6 +21,10 @@ type Message struct {
 	Body   string `json:"body"`
 	Room   int    `json:"room,omitempty"`
 	Time   int    `json:"time,omitempty"`
+}
+
+type TokenBody struct {
+	Token string `json:"token,omitempty"`
 }
 
 //RequestMessage стандартное сообщение с фронтенда
@@ -33,6 +41,7 @@ type ResponseMessage struct {
 	Code   int             `json:"code"`
 	Room   int             `json:"room,omitempty"`
 	Body   json.RawMessage `json:"body,omitempty"`
+	Test   Test            `json:"test,omitempty"`
 }
 
 func (self *Message) String() string {

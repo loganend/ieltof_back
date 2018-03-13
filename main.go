@@ -5,15 +5,12 @@ import (
 	"log"
 	"net/http"
 	"github.com/ieltof/server"
-	"fmt"
 )
 
 
 func main() {
-	fmt.Println("hell")
 	log.SetFlags(log.Lshortfile)
 
-	fmt.Println("hell")
 	server := server.NewServer()
 	go server.Listen()
 

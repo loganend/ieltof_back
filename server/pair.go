@@ -2,6 +2,7 @@ package server
 
 import (
 	"log"
+	"encoding/json"
 )
 
 var roomId int = 0
@@ -22,12 +23,14 @@ type Pair struct {
 	//channelForDescription chan ClientSendDescriptionRoomRequest
 	channelForStatus      chan string
 	server                *Server
-	Talker                *Talker   `json:"client,omitempty"`
+	Talker1               *Talker   `json:"toker1,omitempty"`
+	Talker2               *Talker   `json:"toker2,omitempty"`
 	//Operator              *Operator `json:"operator,omitempty"`
 	Messages              []Message `json:"messages"`
 	Status                string    `json:"status,omitempty"`
 	Description           string    `json:"description,omitempty"`
 	Title                 string    `json:"title,omitempty"`
+	Number 				  int       `json:"title,omitempty"`
 }
 
 // Create new room.
@@ -69,15 +72,16 @@ func (r *Pair) listenWrite() {
 	for {
 		select {
 
-		// отправка сообщений участникам комнаты
-		//case msg := <-r.channelForMessage:
-		//	r.Messages = append(r.Messages, msg)
-		//	messages, _ := json.Marshal(r.Messages)
-		//	response := ResponseMessage{Action: actionSendMessage, Status: "OK", Room: r.Id, Code: 200, Body: messages}
-		//	log.Println(response)
-		//	//r.Client.ch <- response
-		//	//r.Operator.ch <- response
-		//
+		 //отправка сообщений участникам комнаты
+		case msg := <-r.channelForMessage:
+			r.Messages = append(r.Messages, msg)
+			messages, _ := json.Marshal(r.Messages)
+			response := ResponseMessage{Action: actionSendMessage, Status: "OK", Room: r.Id, Code: 200, Body: messages}
+			log.Println(response)
+
+			//r.Client.ch <- response
+			//r.Operator.ch <- response
+
 		//	//добавление описание комнате
 		//case description := <-r.channelForDescription:
 		//	r.Description = description.Description

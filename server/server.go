@@ -5,6 +5,7 @@ import (
 	"golang.org/x/net/websocket"
 	"log"
 	"fmt"
+	"encoding/json"
 )
 
 const (
@@ -14,14 +15,14 @@ const (
 
 type Server struct {
 	messages []*Message
-	pairs     map[int]*Pair
+	queue    []*Talker
+	pairs    map[int]*Pair
 	//операции
 	//клиент
-	addCh chan *Talker
-	delCh chan *Talker
-
+	addCh   chan *Talker
+	delCh   chan *Talker
+	queueCh chan int
 	//комнаты
-	//addRoomCh chan map[Client]Operator
 	addRoomCh chan map[Talker]Talker
 	delRoomCh chan *Talker
 	//остальное
@@ -30,16 +31,14 @@ type Server struct {
 	errCh     chan error
 }
 
-
 // Create new chat server.
 func NewServer() *Server {
 	messages := []*Message{}
-	//operators := make(map[int]*Operator)
+	queue := []*Talker{}
 	pairs := make(map[int]*Pair)
 	addCh := make(chan *Talker)
 	delCh := make(chan *Talker)
-	//addOCh := make(chan *Operator)
-	//delOCh := make(chan *Operator)
+	queueCh := make(chan int)
 	addRoomCh := make(chan map[Talker]Talker)
 	delRoomCh := make(chan *Talker)
 	sendAllCh := make(chan *Message)
@@ -48,12 +47,11 @@ func NewServer() *Server {
 
 	return &Server{
 		messages,
-		//operators,
+		queue,
 		pairs,
 		addCh,
 		delCh,
-		//addOCh,
-		//delOCh,
+		queueCh,
 		addRoomCh,
 		delRoomCh,
 		sendAllCh,
@@ -62,22 +60,16 @@ func NewServer() *Server {
 	}
 }
 
-
 func (s *Server) Add(c *Talker) {
+	fmt.Println(s.addCh)
+	fmt.Println(c)
 	s.addCh <- c
+	fmt.Println("addCh2")
 }
-
-//func (s *Server) AddOperator(o *Operator) {
-//	s.addOCh <- o
-//}
 
 func (s *Server) Del(c *Talker) {
 	s.delCh <- c
 }
-
-//func (s *Server) DelOperator(o *Operator) {
-//	s.delOCh <- o
-//}
 
 func (s *Server) Done() {
 	s.doneCh <- true
@@ -87,18 +79,27 @@ func (s *Server) Err(err error) {
 	s.errCh <- err
 }
 
-//func (s *Server) broadcast(responseMessage ResponseMessage) {
-//	for _, operator := range s.operators {
-//		operator.ch <- responseMessage
-//	}
-//}
+func (s *Server) createResponseAllRooms() ResponseMessage {
+	response := OperatorResponseRooms{s.pairs, len(s.pairs)}
+	jsonstring, _ := json.Marshal(response)
+	msg := ResponseMessage{Action: actionGetAllRooms, Status: "OK", Code: 200, Body: jsonstring}
+	return msg
+}
 
-//func (s *Server) createResponseAllRooms() ResponseMessage {
-//	response := OperatorResponseRooms{s.rooms, len(s.rooms)}
-//	jsonstring, _ := json.Marshal(response)
-//	msg := ResponseMessage{Action: actionGetAllRooms, Status: "OK", Code: 200, Body: jsonstring}
-//	return msg
-//}
+func (s *Server) checkQueue(t int) {
+
+	fmt.Println(t)
+	s.queueCh <- t
+	fmt.Println("addCh2")
+}
+
+func (s *Server) dispatchPair(pair *Pair) {
+	msg := ResponseMessage{Action: initMessage, Status: pair.Talker2.PeerId, Code: 200}
+	pair.Talker1.ch <- msg
+	msg = ResponseMessage{Action: initMessage, Status: pair.Talker1.PeerId, Code: 200}
+	pair.Talker2.ch <- msg
+}
+
 
 // Listen and serve.
 // It serves client connection and broadcast request.
@@ -117,65 +118,56 @@ func (s *Server) Listen() {
 			}
 		}()
 
-		pair := NewPair(s)
-		talker := NewTalker(ws, s, pair)
-		pair.Talker = talker
-		s.pairs[pair.Id] = pair
+		talker := NewTalker(ws, s, nil)
 		s.Add(talker)
-		pair.Listen()
+		s.queue = append(s.queue, talker)
+		fmt.Println(len(s.queue))
+		s.checkQueue(talker.Id)
 		talker.Listen()
+
 	}
 
-	// websocket handler for operator
-	onConnectedOperator := func(ws *websocket.Conn) {
-		defer func() {
-			err := ws.Close()
-			if err != nil {
-				s.errCh <- err
-			}
-		}()
-
-		//operator := NewOperator(ws, s)
-		//s.AddOperator(operator)
-		//operator.Listen()
-	}
 	http.Handle(clientHandlerPattern, websocket.Handler(onConnected))
-	http.Handle(operatorHandlerPattern, websocket.Handler(onConnectedOperator))
 	log.Println("Created handlers")
 
 	for {
+
 		select {
 
-		//// Add new a client
-		//case <-s.addCh:
-		//	msg := s.createResponseAllRooms()
-		//	s.broadcast(msg)
-		//
-		//	// del a client
-		//case <-s.delCh:
-		//	log.Println("Delete client")
-		//	msg := s.createResponseAllRooms()
-		//	s.broadcast(msg)
+		// Add new a client
+		case <-s.addCh:
 
-		//	// Add new a operator
-		//case o := <-s.addOCh:
-		//	log.Println("Added new operator")
-		//	s.operators[o.Id] = o
-		//	msg := s.createResponseAllRooms()
-		//	o.ch <- msg
-		//
-		//	// del a operator
-		//case o := <-s.delOCh:
-		//	log.Println("Delete operator")
-		//	delete(s.operators, o.Id)
-		//
-		//case err := <-s.errCh:
-		//	log.Println("Error:", err.Error())
-		//
-		//case <-s.doneCh:
-		//	return
-		//}
+			// del a client
+		case <-s.delCh:
+			log.Println("Delete client")
+
+		case <-s.queueCh:
+			fmt.Println("Check queue")
+			log.Println("Check queue")
+			if (len(s.queue) > 1) {
+				fmt.Println("get pair")
+				pair := NewPair(s)
+
+
+				pair.Talker1 = s.queue[0]
+				pair.Talker1.pair = pair
+				s.queue = s.queue[1:]
+
+				pair.Talker2 = s.queue[0]
+				pair.Talker2.pair = pair
+				s.queue = s.queue[1:]
+
+				s.pairs[pair.Id] = pair
+				s.dispatchPair(pair)
+			}
+
+		case err := <-s.errCh:
+			log.Println("Error:", err.Error())
+
+		case <-s.doneCh:
+			return
 		}
+		fmt.Println("S.addch end")
 	}
 
 }
