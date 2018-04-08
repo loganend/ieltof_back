@@ -94,12 +94,11 @@ func (s *Server) checkQueue(t int) {
 }
 
 func (s *Server) dispatchPair(pair *Pair) {
-	msg := ResponseMessage{Action: initMessage, Status: pair.Talker2.PeerId, Code: 200}
+	msg := ResponseMessage{Action: initMessage2, Status: pair.Talker2.PeerId, Code: 200}
 	pair.Talker1.ch <- msg
 	msg = ResponseMessage{Action: initMessage, Status: pair.Talker1.PeerId, Code: 200}
 	pair.Talker2.ch <- msg
 }
-
 
 // Listen and serve.
 // It serves client connection and broadcast request.
@@ -119,47 +118,65 @@ func (s *Server) Listen() {
 		}()
 
 		talker := NewTalker(ws, s, nil)
+		log.Println("New Talker: ", talker.Id);
 		s.Add(talker)
 		s.queue = append(s.queue, talker)
-		fmt.Println(len(s.queue))
+
+		log.Println("len queue", len(s.queue))
+		log.Println("queue: ", s.queue);
+
 		s.checkQueue(talker.Id)
 		talker.Listen()
-
 	}
 
 	http.Handle(clientHandlerPattern, websocket.Handler(onConnected))
 	log.Println("Created handlers")
 
 	for {
-
 		select {
 
 		// Add new a client
 		case <-s.addCh:
 
-			// del a client
-		case <-s.delCh:
+		case c := <-s.delCh:
 			log.Println("Delete client")
 
-		case <-s.queueCh:
-			fmt.Println("Check queue")
-			log.Println("Check queue")
-			if (len(s.queue) > 1) {
-				fmt.Println("get pair")
-				pair := NewPair(s)
 
 
-				pair.Talker1 = s.queue[0]
-				pair.Talker1.pair = pair
-				s.queue = s.queue[1:]
-
-				pair.Talker2 = s.queue[0]
-				pair.Talker2.pair = pair
-				s.queue = s.queue[1:]
-
-				s.pairs[pair.Id] = pair
-				s.dispatchPair(pair)
+			for i := 0; i < len(s.queue); i++ {
+				if (s.queue[i].Id == c.Id) {
+					if (i == len(s.queue)-1) {
+						s.queue = append(s.queue[:i]);
+					}else{
+						s.queue = append(s.queue[:i], s.queue[i+1]);
+					}
+					//if (c.pair.Talker1.Id != c.Id) {
+					//	c.dispatchDisconectMessage(c.pair.Talker1)
+					//}else {
+					//	c.dispatchDisconectMessage(c.pair.Talker2)
+					//}
+				}
 			}
+
+		case <-s.queueCh:
+			log.Println("Check queue")
+
+			//if (len(s.queue) > 1) {
+			//	fmt.Println("get pair")
+			//	pair := NewPair(s)
+			//
+			//
+			//	pair.Talker1 = s.queue[0]
+			//	pair.Talker1.pair = pair
+			//	s.queue = s.queue[1:]
+			//
+			//	pair.Talker2 = s.queue[0]
+			//	pair.Talker2.pair = pair
+			//	s.queue = s.queue[1:]
+			//
+			//	s.pairs[pair.Id] = pair
+			//	s.dispatchPair(pair)
+			//}
 
 		case err := <-s.errCh:
 			log.Println("Error:", err.Error())
@@ -169,5 +186,4 @@ func (s *Server) Listen() {
 		}
 		fmt.Println("S.addch end")
 	}
-
 }

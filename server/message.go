@@ -13,6 +13,9 @@ const (
 	initMessage 			= "init"
 	initMessage2 			= "init2"
 	actionGetTest			= "getTest"
+	initViedoChat			= "INIT_VIDEO_CHAT"
+	getNextPartner			= "GET_NEXT_PARTNER"
+	disconectMessage  		= "DISCONNECTED_PAIR"
 	actionChangeStatusRooms = "changeStatusRoom"
 )
 

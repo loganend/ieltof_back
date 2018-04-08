@@ -16,6 +16,7 @@ var maxId int = 0
 type Talker struct {
 	Id        int    `json:"id"`
 	PeerId    string `json:"peerId"`
+	ready     bool
 	ws        *websocket.Conn
 	server    *Server
 	pair      *Pair
@@ -40,7 +41,7 @@ func NewTalker(ws *websocket.Conn, server *Server, pair *Pair) *Talker {
 	doneCh := make(chan bool)
 	addRoomCh := make(chan *Pair)
 	delRoomCh := make(chan *Pair)
-	return &Talker{maxId, "", ws, server, pair, ch, doneCh, addRoomCh, delRoomCh}
+	return &Talker{maxId, "", false, ws, server, pair, ch, doneCh, addRoomCh, delRoomCh}
 }
 
 func (c *Talker) Conn() *websocket.Conn {
@@ -51,14 +52,12 @@ func (c *Talker) Done() {
 	c.doneCh <- true
 }
 
-// Listen Write and Read request via chanel
 func (c *Talker) Listen() {
 
 	go c.listenWrite()
 	c.listenRead()
 }
 
-// Listen write request via chanel
 func (c *Talker) listenWrite() {
 	log.Println("Listening write to client")
 	for {
@@ -66,7 +65,7 @@ func (c *Talker) listenWrite() {
 
 		// send message to the client
 		case msg := <-c.ch:
-			log.Println("Send:", msg, c.ws)
+			//log.Println("Send:", msg, c.ws)
 			websocket.JSON.Send(c.ws, msg)
 
 			// receive done request
@@ -87,6 +86,13 @@ func (c *Talker) listenWrite() {
 		}
 
 	}
+}
+
+func (t *Talker) dispatchDisconectMessage(t_pair *Talker) {
+
+	msg := ResponseMessage{Action: disconectMessage, Status: t_pair.PeerId, Code: 200}
+	t_pair.ch <- msg
+
 }
 
 // Listen read request via chanel
@@ -110,46 +116,9 @@ func (c *Talker) listenRead() {
 			} else if err != nil {
 				c.server.Err(err)
 			}
-			log.Println(msg)
+			//log.Println(msg)
 
 			switch msg.Action {
-
-			case initMessage:
-				log.Println(initMessage)
-				var message Message
-				err := json.Unmarshal(msg.Body, &message)
-				if !CheckError(err, "Invalid RawData"+string(msg.Body), false) {
-					msg := ResponseMessage{Action: initMessage, Status: "Invalid Request", Code: 403}
-					c.ch <- msg
-				}
-
-				if (c.pair.Talker2 != nil) {
-					if (c.pair.Talker1 == c) {
-						message.Author = c.PeerId
-						message.Room = c.pair.Id
-						message.Time = int(time.Now().Unix())
-						b, err := json.Marshal(message)
-						if err != nil {
-							fmt.Println(err)
-							return
-						}
-						c.pair.Talker2.ch <- ResponseMessage{Action: initMessage, Status: "OK", Code: 200, Body: b}
-						//c.pair.channelForMessage <- message
-					} else {
-						message.Author =  c.PeerId
-						message.Room = c.pair.Id
-						message.Time = int(time.Now().Unix())
-						b, err := json.Marshal(message)
-						if err != nil {
-							fmt.Println(err)
-							return
-						}
-						c.pair.Talker1.ch <- ResponseMessage{Action: initMessage, Status: "OK", Code: 200, Body: b}
-					}
-				} else {
-					msg := ResponseMessage{Action: initMessage, Status: "Room not found", Code: 404}
-					c.ch <- msg
-				}
 
 			case actionGetTest:
 				test := NewTest()
@@ -162,7 +131,6 @@ func (c *Talker) listenRead() {
 				fmt.Println(b)
 				c.ch <- ResponseMessage{Action: actionGetTest, Status: "OK", Code: 200, Body: b, Test: test}
 
-
 			case actionToken:
 				log.Println(actionToken)
 				var token TokenBody
@@ -174,6 +142,90 @@ func (c *Talker) listenRead() {
 				log.Println(token.Token)
 
 				c.PeerId = token.Token;
+
+			case initViedoChat:
+
+				log.Println(initViedoChat)
+				var message Message
+				err := json.Unmarshal(msg.Body, &message)
+				if !CheckError(err, "Invalid RawData"+string(msg.Body), false) {
+					msg := ResponseMessage{Action: initViedoChat, Status: "Invalid Request", Code: 403}
+					c.ch <- msg
+				}
+				c.ready = true;
+
+				if (len(c.server.queue) > 1) {
+					pair := NewPair(c.server)
+					log.Println("queue len")
+					log.Println(len(c.server.queue))
+					for i := 0; i < len(c.server.queue); i++ {
+						log.Println(i);
+						log.Println("c.server.queue[i].Id %d \n", c.server.queue[i].Id)
+						log.Println("c.Id %d \n", c.Id)
+						log.Println("c.server.queue[i].ready %d \n", c.server.queue[i].ready)
+						if(c.server.queue[i].Id != c.Id && c.server.queue[i].ready){
+							pair.Talker1 = c.server.queue[i]
+							pair.Talker1.pair = pair
+							//c.server.queue = c.server.queue[i+1:]
+
+							pair.Talker2 = c;
+							pair.Talker2.pair = pair
+							c.ready = false;
+
+
+							//c.server.queue = c.server.queue[i+1:]
+
+							c.server.pairs[pair.Id] = pair
+							c.server.dispatchPair(pair)
+						}
+					}
+				}
+
+			case getNextPartner:
+
+				log.Println(getNextPartner)
+				var message Message
+				err := json.Unmarshal(msg.Body, &message)
+				if !CheckError(err, "Invalid RawData"+string(msg.Body), false) {
+					msg := ResponseMessage{Action: getNextPartner, Status: "Invalid Request", Code: 403}
+					c.ch <- msg
+				}
+
+
+				if(c.pair.Talker1.Id != c.Id){
+					c.dispatchDisconectMessage(c.pair.Talker1);
+				} else {
+					c.dispatchDisconectMessage(c.pair.Talker2);
+				}
+
+				c.ready = true;
+
+				if (len(c.server.queue) > 1) {
+					pair := NewPair(c.server)
+					log.Println("queue len")
+					log.Println(len(c.server.queue))
+					for i := 0; i < len(c.server.queue); i++ {
+						log.Println(i);
+						log.Println("c.server.queue[i].Id %d \n", c.server.queue[i].Id)
+						log.Println("c.Id %d \n", c.Id)
+						log.Println("c.server.queue[i].ready %d \n", c.server.queue[i].ready)
+						if(c.server.queue[i].Id != c.Id && c.server.queue[i].ready){
+							pair.Talker1 = c.server.queue[i]
+							pair.Talker1.pair = pair
+							//c.server.queue = c.server.queue[i+1:]
+
+							pair.Talker2 = c;
+							pair.Talker2.pair = pair
+							c.ready = false;
+
+
+							//c.server.queue = c.server.queue[i+1:]
+
+							c.server.pairs[pair.Id] = pair
+							c.server.dispatchPair(pair)
+						}
+					}
+				}
 
 				//отправка сообщений
 			case actionSendMessage:
@@ -214,25 +266,11 @@ func (c *Talker) listenRead() {
 					c.ch <- msg
 				}
 
-				//	//описание комнаты
-				//case actionSendDescriptionRoom:
-				//	log.Println(actionSendDescriptionRoom)
-				//	var roomDescription ClientSendDescriptionRoomRequest
-				//	err := json.Unmarshal(msg.Body, &roomDescription)
-				//	if !CheckError(err, "Invalid RawData"+string(msg.Body), false) {
-				//		msg := ResponseMessage{Action: actionSendDescriptionRoom, Status: "Invalid Request", Code: 403}
-				//		c.ch <- msg
-				//	} else {
-				//		c.pair.channelForDescription <- roomDescription
-				//	}
-
-				//закрытие комнаты
 			case actionCloseRoom:
 				log.Println(actionCloseRoom)
 				c.pair.Status = roomClose
 				c.pair.channelForStatus <- roomClose
 
-				//получение всех сообщений
 			case actionGetAllMessages:
 				log.Println(actionGetAllMessages)
 				messages, _ := json.Marshal(c.pair.Messages)
@@ -243,3 +281,42 @@ func (c *Talker) listenRead() {
 		}
 	}
 }
+
+//case initMessage:
+//
+//
+//log.Println(initMessage)
+//var message Message
+//err := json.Unmarshal(msg.Body, &message)
+//if !CheckError(err, "Invalid RawData"+string(msg.Body), false) {
+//msg := ResponseMessage{Action: initMessage, Status: "Invalid Request", Code: 403}
+//c.ch <- msg
+//}
+//
+//if (c.pair.Talker2 != nil) {
+//if (c.pair.Talker1 == c) {
+//message.Author = c.PeerId
+//message.Room = c.pair.Id
+//message.Time = int(time.Now().Unix())
+//b, err := json.Marshal(message)
+//if err != nil {
+//fmt.Println(err)
+//return
+//}
+//c.pair.Talker2.ch <- ResponseMessage{Action: initMessage, Status: "OK", Code: 200, Body: b}
+////c.pair.channelForMessage <- message
+//} else {
+//message.Author =  c.PeerId
+//message.Room = c.pair.Id
+//message.Time = int(time.Now().Unix())
+//b, err := json.Marshal(message)
+//if err != nil {
+//fmt.Println(err)
+//return
+//}
+//c.pair.Talker1.ch <- ResponseMessage{Action: initMessage, Status: "OK", Code: 200, Body: b}
+//}
+//} else {
+//msg := ResponseMessage{Action: initMessage, Status: "Room not found", Code: 404}
+//c.ch <- msg
+//}
