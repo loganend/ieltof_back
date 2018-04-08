@@ -90,6 +90,7 @@ func (c *Talker) listenWrite() {
 
 func (t *Talker) dispatchDisconectMessage(t_pair *Talker) {
 
+	t_pair.pair = nil;
 	msg := ResponseMessage{Action: disconectMessage, Status: t_pair.PeerId, Code: 200}
 	t_pair.ch <- msg
 
@@ -166,6 +167,7 @@ func (c *Talker) listenRead() {
 						if(c.server.queue[i].Id != c.Id && c.server.queue[i].ready){
 							pair.Talker1 = c.server.queue[i]
 							pair.Talker1.pair = pair
+							pair.Talker1.ready = false;
 							//c.server.queue = c.server.queue[i+1:]
 
 							pair.Talker2 = c;
@@ -192,10 +194,19 @@ func (c *Talker) listenRead() {
 				}
 
 
-				if(c.pair.Talker1.Id != c.Id){
-					c.dispatchDisconectMessage(c.pair.Talker1);
-				} else {
-					c.dispatchDisconectMessage(c.pair.Talker2);
+
+				if(c.pair != nil) {
+
+					log.Println(c.Id);
+					log.Println(c.pair.Talker1.Id);
+					log.Println(c.pair.Talker2.Id);
+
+					if (c.pair.Talker1.Id != c.Id) {
+						c.dispatchDisconectMessage(c.pair.Talker1);
+					} else {
+						c.dispatchDisconectMessage(c.pair.Talker2);
+					}
+					c.pair = nil;
 				}
 
 				c.ready = true;
@@ -211,7 +222,9 @@ func (c *Talker) listenRead() {
 						log.Println("c.server.queue[i].ready %d \n", c.server.queue[i].ready)
 						if(c.server.queue[i].Id != c.Id && c.server.queue[i].ready){
 							pair.Talker1 = c.server.queue[i]
+							pair.Talker1.ready = false;
 							pair.Talker1.pair = pair
+
 							//c.server.queue = c.server.queue[i+1:]
 
 							pair.Talker2 = c;
@@ -226,6 +239,31 @@ func (c *Talker) listenRead() {
 						}
 					}
 				}
+
+			case stopVideoChat:
+
+				log.Println(stopVideoChat)
+				var message Message
+				err := json.Unmarshal(msg.Body, &message)
+				if !CheckError(err, "Invalid RawData"+string(msg.Body), false) {
+					msg := ResponseMessage{Action: stopVideoChat, Status: "Invalid Request", Code: 403}
+					c.ch <- msg
+				}
+
+				if(c.pair != nil) {
+					log.Println(c.Id);
+					log.Println(c.pair.Talker1.Id);
+					log.Println(c.pair.Talker2.Id);
+
+					if (c.pair.Talker1.Id != c.Id) {
+						c.dispatchDisconectMessage(c.pair.Talker1);
+					} else {
+						c.dispatchDisconectMessage(c.pair.Talker2);
+					}
+					c.pair = nil;
+				}
+				c.ready = false;
+
 
 				//отправка сообщений
 			case actionSendMessage:

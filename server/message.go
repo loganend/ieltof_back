@@ -15,6 +15,7 @@ const (
 	actionGetTest			= "getTest"
 	initViedoChat			= "INIT_VIDEO_CHAT"
 	getNextPartner			= "GET_NEXT_PARTNER"
+	stopVideoChat			= "STOP_VIDEO_CHAT"
 	disconectMessage  		= "DISCONNECTED_PAIR"
 	actionChangeStatusRooms = "changeStatusRoom"
 )
