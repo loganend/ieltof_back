@@ -12,7 +12,7 @@ const (
 	actionToken				= "token"
 	initMessage 			= "init"
 	initMessage2 			= "init2"
-	actionGetTest			= "getTest"
+	actionGetTest			= "GET_TEST"
 	initViedoChat			= "INIT_VIDEO_CHAT"
 	getNextPartner			= "GET_NEXT_PARTNER"
 	stopVideoChat			= "STOP_VIDEO_CHAT"
