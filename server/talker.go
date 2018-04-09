@@ -17,6 +17,7 @@ type Talker struct {
 	Id        int    `json:"id"`
 	PeerId    string `json:"peerId"`
 	ready     bool
+	testId    int
 	ws        *websocket.Conn
 	server    *Server
 	pair      *Pair
@@ -41,7 +42,7 @@ func NewTalker(ws *websocket.Conn, server *Server, pair *Pair) *Talker {
 	doneCh := make(chan bool)
 	addRoomCh := make(chan *Pair)
 	delRoomCh := make(chan *Pair)
-	return &Talker{maxId, "", false, ws, server, pair, ch, doneCh, addRoomCh, delRoomCh}
+	return &Talker{maxId, "", false, 9999, ws, server, pair, ch, doneCh, addRoomCh, delRoomCh}
 }
 
 func (c *Talker) Conn() *websocket.Conn {
@@ -122,7 +123,31 @@ func (c *Talker) listenRead() {
 			switch msg.Action {
 
 			case actionGetTest:
-				test := NewTest()
+
+				log.Println(actionGetTest);
+
+				var test Test;
+				if(c.testId == 9999) {
+					c.testId = c.Id;
+				}else{
+					c.testId = c.testId + 1;
+				}
+
+				switch c.testId % 6 {
+				case 1:
+					test = getTest1()
+				case 2:
+					test = getTest2()
+				case 3:
+					test = getTest3()
+				case 4:
+					test = getTest4()
+				case 5:
+					test = getTest5()
+				case 0:
+					test = getTest6()
+				}
+
 				b, err := json.Marshal(test)
 				if err != nil {
 					fmt.Println(err)
@@ -154,7 +179,6 @@ func (c *Talker) listenRead() {
 					c.ch <- msg
 				}
 				c.ready = true;
-
 				if (len(c.server.queue) > 1) {
 					pair := NewPair(c.server)
 					log.Println("queue len")
@@ -164,7 +188,7 @@ func (c *Talker) listenRead() {
 						log.Println("c.server.queue[i].Id %d \n", c.server.queue[i].Id)
 						log.Println("c.Id %d \n", c.Id)
 						log.Println("c.server.queue[i].ready %d \n", c.server.queue[i].ready)
-						if(c.server.queue[i].Id != c.Id && c.server.queue[i].ready){
+						if (c.server.queue[i].Id != c.Id && c.server.queue[i].ready) {
 							pair.Talker1 = c.server.queue[i]
 							pair.Talker1.pair = pair
 							pair.Talker1.ready = false;
@@ -173,7 +197,6 @@ func (c *Talker) listenRead() {
 							pair.Talker2 = c;
 							pair.Talker2.pair = pair
 							c.ready = false;
-
 
 							//c.server.queue = c.server.queue[i+1:]
 
@@ -193,14 +216,11 @@ func (c *Talker) listenRead() {
 					c.ch <- msg
 				}
 
-
-
-				if(c.pair != nil) {
+				if (c.pair != nil) {
 
 					log.Println(c.Id);
 					log.Println(c.pair.Talker1.Id);
 					log.Println(c.pair.Talker2.Id);
-
 					if (c.pair.Talker1.Id != c.Id) {
 						c.dispatchDisconectMessage(c.pair.Talker1);
 					} else {
@@ -210,7 +230,6 @@ func (c *Talker) listenRead() {
 				}
 
 				c.ready = true;
-
 				if (len(c.server.queue) > 1) {
 					pair := NewPair(c.server)
 					log.Println("queue len")
@@ -220,7 +239,7 @@ func (c *Talker) listenRead() {
 						log.Println("c.server.queue[i].Id %d \n", c.server.queue[i].Id)
 						log.Println("c.Id %d \n", c.Id)
 						log.Println("c.server.queue[i].ready %d \n", c.server.queue[i].ready)
-						if(c.server.queue[i].Id != c.Id && c.server.queue[i].ready){
+						if (c.server.queue[i].Id != c.Id && c.server.queue[i].ready) {
 							pair.Talker1 = c.server.queue[i]
 							pair.Talker1.ready = false;
 							pair.Talker1.pair = pair
@@ -230,7 +249,6 @@ func (c *Talker) listenRead() {
 							pair.Talker2 = c;
 							pair.Talker2.pair = pair
 							c.ready = false;
-
 
 							//c.server.queue = c.server.queue[i+1:]
 
@@ -250,11 +268,10 @@ func (c *Talker) listenRead() {
 					c.ch <- msg
 				}
 
-				if(c.pair != nil) {
+				if (c.pair != nil) {
 					log.Println(c.Id);
 					log.Println(c.pair.Talker1.Id);
 					log.Println(c.pair.Talker2.Id);
-
 					if (c.pair.Talker1.Id != c.Id) {
 						c.dispatchDisconectMessage(c.pair.Talker1);
 					} else {
@@ -263,7 +280,6 @@ func (c *Talker) listenRead() {
 					c.pair = nil;
 				}
 				c.ready = false;
-
 
 				//отправка сообщений
 			case actionSendMessage:
@@ -276,32 +292,34 @@ func (c *Talker) listenRead() {
 					c.ch <- msg
 				}
 
-				if (c.pair.Talker2 != nil) {
-					if (c.pair.Talker1 == c) {
-						message.Author = "client"
-						message.Room = c.pair.Id
-						message.Time = int(time.Now().Unix())
-						b, err := json.Marshal(message)
-						if err != nil {
-							fmt.Println(err)
-							return
+				if(c.pair != nil) {
+					if (c.pair.Talker2 != nil) {
+						if (c.pair.Talker1 == c) {
+							message.Author = "client"
+							message.Room = c.pair.Id
+							message.Time = int(time.Now().Unix())
+							b, err := json.Marshal(message)
+							if err != nil {
+								fmt.Println(err)
+								return
+							}
+							c.pair.Talker2.ch <- ResponseMessage{Action: actionSendMessage, Status: message.Body, Code: 200, Body: b}
+							//c.pair.channelForMessage <- message
+						} else {
+							message.Author = "client"
+							message.Room = c.pair.Id
+							message.Time = int(time.Now().Unix())
+							b, err := json.Marshal(message)
+							if err != nil {
+								fmt.Println(err)
+								return
+							}
+							c.pair.Talker1.ch <- ResponseMessage{Action: actionSendMessage, Status: message.Body, Code: 200, Body: b}
 						}
-						c.pair.Talker2.ch <- ResponseMessage{Action: actionSendMessage, Status: message.Body, Code: 200, Body: b}
-						//c.pair.channelForMessage <- message
 					} else {
-						message.Author = "client"
-						message.Room = c.pair.Id
-						message.Time = int(time.Now().Unix())
-						b, err := json.Marshal(message)
-						if err != nil {
-							fmt.Println(err)
-							return
-						}
-						c.pair.Talker1.ch <- ResponseMessage{Action: actionSendMessage, Status: message.Body, Code: 200, Body: b}
+						msg := ResponseMessage{Action: actionSendMessage, Status: "Room not found", Code: 404}
+						c.ch <- msg
 					}
-				} else {
-					msg := ResponseMessage{Action: actionSendMessage, Status: "Room not found", Code: 404}
-					c.ch <- msg
 				}
 
 			case actionCloseRoom:
