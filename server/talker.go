@@ -124,8 +124,6 @@ func (c *Talker) listenRead() {
 
 			case actionGetTest:
 
-				log.Println(actionGetTest);
-
 				var test Test;
 				if(c.testId == 9999) {
 					c.testId = c.Id;
