@@ -21,11 +21,11 @@ func routes(webserviceHandler interfaces.WebserviceHandler) *httprouter.Router {
 	//r.NotFound = alice.
 	//	New().ThenFunc(controller.Error404)
 
-	r.POST("/api/user",  hr.Handler(alice.New().ThenFunc(webserviceHandler.GetUser)))
-	r.GET("/api/users", hr.Handler(alice.New().ThenFunc(webserviceHandler.GetUsers)))
+	r.POST("/api2/user",  hr.Handler(alice.New().ThenFunc(webserviceHandler.GetUser)))
+	r.GET("/api2/users", hr.Handler(alice.New().ThenFunc(webserviceHandler.GetUsers)))
 
-	r.POST("/api/friend",  hr.Handler(alice.New().ThenFunc(webserviceHandler.FriendRequest)))
-	r.GET("/api/friends", hr.Handler(alice.New().ThenFunc(webserviceHandler.GetFriends)))
+	r.POST("/api2/friend",  hr.Handler(alice.New().ThenFunc(webserviceHandler.FriendRequest)))
+	r.GET("/api2/friends", hr.Handler(alice.New().ThenFunc(webserviceHandler.GetFriends)))
 
 	return r
 }
