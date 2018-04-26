@@ -1,0 +1,24 @@
+{
+  "Database": {
+    "Type": "Postgres",
+    "Postgres": {
+      "Username": "serqeycheremisin",
+      "Password": "sergey90x",
+      "Name": "ieltof",
+      "Hostname": "127.0.0.1",
+      "Port": 5432,
+      "Parameter": "?parseTime=true"
+    }
+  },
+
+  "Server": {
+    "Hostname": "",
+    "UseHTTP": true,
+    "UseHTTPS": false,
+    "HTTPPort": 8000,
+    "HTTPSPort": 443,
+    "CertFile": "tls/server.crt",
+    "KeyFile": "tls/server.key",
+    "Pool": 2
+  }
+}
