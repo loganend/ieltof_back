@@ -17,7 +17,6 @@ CREATE TABLE "friends" (
   "uid" integer REFERENCES "users" (id),
   "fid" integer NOT NULL,
   "apt" BOOLEAN
---   Constraint "friends_pkey" Primary Key ("id")
 );
 
 CREATE TABLE "messages" (
@@ -26,7 +25,6 @@ CREATE TABLE "messages" (
   "did" integer REFERENCES "friends" (id),
   "text" text,
   "tmp" BIGINT
---   Constraint "messages_pkey" Primary Key ("id")
 );
 
 

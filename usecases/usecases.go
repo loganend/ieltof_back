@@ -23,7 +23,6 @@ type Interactor struct {
 	MessageRepository  domain.MessageRepository
 }
 
-
 func (interactor *Interactor) GetUser(user domain.User) (domain.User, error) {
 
 	u := interactor.UserRepository.GetUser(user)
@@ -50,9 +49,9 @@ func (interactor *Interactor) GetFriends(userId int) ([]domain.Friend, error) {
 	return friends, nil
 }
 
-func (interactor *Interactor) FriendRequest(friendRequest domain.FriendRequest) error {
-	interactor.FriendRepository.FriendRequest(friendRequest)
-	return nil
+func (interactor *Interactor) FriendRequest(friendRequest domain.FriendRequest) (bool, error) {
+	res := interactor.FriendRepository.FriendRequest(friendRequest)
+	return res, nil
 }
 
 func (interactor *Interactor) InitMessage(friendRequest domain.FriendRequest) error {
@@ -64,6 +63,7 @@ func (interactor *Interactor) GetMessages(id uint32) ([]domain.Message, error) {
 	return []domain.Message{}, nil
 }
 
-func (interactor *Interactor) NewMessage(userId, orderId, itemId int) error {
-	return nil
+func (interactor *Interactor) NewMessage(message domain.Message) (domain.Message, error) {
+	msg := interactor.MessageRepository.NewMessage(message)
+	return msg, nil
 }

@@ -38,6 +38,8 @@ func (repo *DbUserRepo) NewUser(user domain.User) {
 
 func (repo *DbUserRepo) GetUser(user domain.User) domain.User {
 
+
+	fmt.Println("GETUSER");
 	row := repo.dbHandler.Query(fmt.Sprintf("SELECT * FROM users WHERE fid = '%s' LIMIT 1", user.FacebookId))
 
 	var id uint32
@@ -110,9 +112,16 @@ func (repo *DbFriendRepo) FindById(id int) domain.Friend {
 	return f;
 }
 
-func (repo *DbFriendRepo) FriendRequest(friendRequest domain.FriendRequest) {
-	repo.dbHandler.Execute(fmt.Sprintf("INSERT INTO friends (uid, fid, apt) VALUES ('%d', '%d', '%t')",
+func (repo *DbFriendRepo) FriendRequest(friendRequest domain.FriendRequest) bool{
+
+		row := repo.dbHandler.Query(fmt.Sprintf("SELECT * FROM friends WHERE uid = '%d' AND fid = '%d'", friendRequest.FromId, friendRequest.ToId))
+		if 	row.Next() {
+			return false;
+		}
+
+		repo.dbHandler.Execute(fmt.Sprintf("INSERT INTO friends (uid, fid, apt) VALUES ('%d', '%d', '%t')",
 		friendRequest.FromId, friendRequest.ToId, false))
+		return true
 }
 
 func NewDbMessageRepo(dbHandlers map[string]DbHandler) *DbMessageRepo {
@@ -140,8 +149,11 @@ func (repo *DbMessageRepo) InitMessage(friendRequest domain.FriendRequest) {
 	}
 }
 
-func (repo *DbMessageRepo) NewMessage(user domain.Message) {
-
+func (repo *DbMessageRepo) NewMessage(message domain.Message) domain.Message {
+	message.Timestamp = time.Now().Unix()
+	repo.dbHandler.Execute(fmt.Sprintf("INSERT INTO messages (uid, did, text, tmp) VALUES ('%d', '%d', '%s', '%d')",
+		message.Id, message.DialogId, message.Text, message.Timestamp))
+	return message
 }
 
 func (repo *DbMessageRepo) GetMessages(dialogId uint32) []domain.Message {
@@ -151,7 +163,7 @@ func (repo *DbMessageRepo) GetMessages(dialogId uint32) []domain.Message {
 	var uid uint32
 	var did uint32
 	var text string
-	var timestamp uint32
+	var timestamp int64
 	var messages []domain.Message;
 	for row.Next() {
 		row.Scan(&id, &uid, &did, &text, &timestamp)

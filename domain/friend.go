@@ -2,7 +2,7 @@ package domain
 
 type FriendRepository interface {
 	GetFriends(userId int) []Friend
-	FriendRequest(friendRequest FriendRequest)
+	FriendRequest(friendRequest FriendRequest) bool
 }
 
 type Friend struct {

@@ -9,11 +9,6 @@ import (
 	"strconv"
 )
 
-//type UserInteractor interface {
-//	GetUser(domain.User) (domain.User, error)
-//	NewUser(domain.User) error
-//	GetUsers() ([]domain.User, error)
-//}
 
 type Interator interface {
 	GetUser(domain.User) (domain.User, error)
@@ -21,34 +16,20 @@ type Interator interface {
 	GetUsers() ([]domain.User, error)
 
 	GetFriends(userId int) ([]domain.Friend, error)
-	FriendRequest(domain.FriendRequest) error
+	FriendRequest(domain.FriendRequest) (bool, error)
 
 	GetMessages(orderId uint32) ([]domain.Message, error)
-	NewMessage(userId, orderId, itemId int) error
+	NewMessage(message domain.Message) (domain.Message, error)
 	InitMessage(request domain.FriendRequest) error
 }
 
-//
-//
-//type FriendInteractor interface {
-//	GetFriends(userId int) (domain.User, error)
-//	FriendRequest(domain.FriendRequest) error
-//}
-//
-//type MessageInteractor interface {
-//	GetMessages(orderId int) (domain.User, error)
-//	NewMessage(userId, orderId, itemId int) error
-//	InitMessage(request domain.FriendRequest) error
-//}
 
 type WebserviceHandler struct {
 	Interator Interator
-	//UserInteractor    UserInteractor
-	//FriendInteractor  FriendInteractor
-	//MessageInteractor MessageInteractor
 }
 
 func (handler WebserviceHandler) GetUser(res http.ResponseWriter, req *http.Request) {
+
 	var err error
 	b, err := ioutil.ReadAll(req.Body)
 	defer req.Body.Close()
@@ -124,8 +105,11 @@ func (handler WebserviceHandler) FriendRequest(res http.ResponseWriter, req *htt
 		res.WriteHeader(http.StatusPreconditionFailed)
 	}
 
-	handler.Interator.FriendRequest(friendRequest);
-	handler.Interator.InitMessage(friendRequest);
+	isOk, _ := handler.Interator.FriendRequest(friendRequest);
+
+	if(isOk) {
+		handler.Interator.InitMessage(friendRequest);
+	}
 }
 
 func (handler WebserviceHandler) GetFriends(res http.ResponseWriter, req *http.Request) {

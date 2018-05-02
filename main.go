@@ -12,6 +12,7 @@ import (
 	"github.com/ieltof/interfaces"
 	"github.com/ieltof/usecases"
 	"encoding/json"
+	"github.com/ieltof/online"
 )
 
 
@@ -42,6 +43,9 @@ func main() {
 	//webserviceHandler.UserInteractor = userInteractor
 	//webserviceHandler.FriendInteractor = friendInterator
 	//webserviceHandler.MessageInteractor = messageInterator
+
+	hub := online.NewHub(webserviceHandler);
+	go hub.Listen()
 
 	server := server.NewServer()
 	go server.Listen()
