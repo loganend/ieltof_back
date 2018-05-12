@@ -1,8 +1,10 @@
 package domain
 
 type FriendRepository interface {
-	GetFriends(userId int) []Friend
+	GetFriends(userId uint32) []Friend
 	FriendRequest(friendRequest FriendRequest) bool
+	AcceptFriendship(friend Friend) bool
+	IgnoreFriendship(friend Friend) bool
 }
 
 type Friend struct {
@@ -11,6 +13,8 @@ type Friend struct {
 	Fid uint32 `db:"fid" json:"friend_id"`
 	Apt bool   `db:"apt" json:"accept"`
 	Messages[] Message `json:"messages"`
+	Name string `json:"name"`
+	Url string `json:"url"`
 }
 
 type FriendRequest struct {

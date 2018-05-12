@@ -38,16 +38,27 @@ func (interator *Interactor) GetUsers() ([]domain.User, error) {
 	return interator.UserRepository.GetUsers(), nil
 }
 
-func (interactor *Interactor) GetFriends(userId int) ([]domain.Friend, error) {
+func (interator *Interactor) GetOnlineUsers(ids []uint32) ([]domain.User, error) {
+	users := interator.UserRepository.GetOnlineUsers(ids)
+
+	return users, nil
+}
+
+func (interactor *Interactor) GetFriends(userId uint32) ([]domain.Friend, error) {
 
 	friends := interactor.FriendRepository.GetFriends(userId)
 
-	for index, relation := range friends {
-		friends[index].Messages = interactor.MessageRepository.GetMessages(relation.Id)
-	}
-
 	return friends, nil
 }
+
+func (interator *Interactor) AcceptFriendship(friend domain.Friend) (bool, error) {
+	return interator.FriendRepository.AcceptFriendship(friend), nil
+}
+
+func (interator *Interactor) IgnoreFriendship(friend domain.Friend) (bool, error) {
+	return interator.FriendRepository.IgnoreFriendship(friend), nil
+}
+
 
 func (interactor *Interactor) FriendRequest(friendRequest domain.FriendRequest) (bool, error) {
 	res := interactor.FriendRepository.FriendRequest(friendRequest)

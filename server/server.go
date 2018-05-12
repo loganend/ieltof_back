@@ -1,7 +1,6 @@
 package server
 
 import (
-	"net/http"
 	"golang.org/x/net/websocket"
 	"log"
 	"fmt"
@@ -102,34 +101,57 @@ func (s *Server) dispatchPair(pair *Pair) {
 
 // Listen and serve.
 // It serves client connection and broadcast request.
+
+func (s *Server) InitVideoChat(ws *websocket.Conn) {
+	fmt.Println("Talker came")
+	defer func() {
+		err := ws.Close()
+		if err != nil {
+			s.errCh <- err
+		}
+	}()
+
+	talker := NewTalker(ws, s, nil)
+	log.Println("New Talker: ", talker.Id);
+	s.Add(talker)
+	s.queue = append(s.queue, talker)
+
+	log.Println("len queue", len(s.queue))
+	log.Println("queue: ", s.queue);
+
+	s.checkQueue(talker.Id)
+	talker.Listen()
+}
+
 func (s *Server) Listen() {
 
 	log.Println("Listening server...")
 
-	// websocket handler for client
-	onConnected := func(ws *websocket.Conn) {
+	//// websocket handler for client
+	//onConnected := func(ws *websocket.Conn) {
+	//
+	//	fmt.Println("Talker came")
+	//	defer func() {
+	//		err := ws.Close()
+	//		if err != nil {
+	//			s.errCh <- err
+	//		}
+	//	}()
+	//
+	//	talker := NewTalker(ws, s, nil)
+	//	log.Println("New Talker: ", talker.Id);
+	//	s.Add(talker)
+	//	s.queue = append(s.queue, talker)
+	//
+	//	log.Println("len queue", len(s.queue))
+	//	log.Println("queue: ", s.queue);
+	//
+	//	s.checkQueue(talker.Id)
+	//	talker.Listen()
+	//}
+	//
+	//http.Handle(clientHandlerPattern, websocket.Handler(onConnected))
 
-		fmt.Println("Talker came")
-		defer func() {
-			err := ws.Close()
-			if err != nil {
-				s.errCh <- err
-			}
-		}()
-
-		talker := NewTalker(ws, s, nil)
-		log.Println("New Talker: ", talker.Id);
-		s.Add(talker)
-		s.queue = append(s.queue, talker)
-
-		log.Println("len queue", len(s.queue))
-		log.Println("queue: ", s.queue);
-
-		s.checkQueue(talker.Id)
-		talker.Listen()
-	}
-
-	http.Handle(clientHandlerPattern, websocket.Handler(onConnected))
 	log.Println("Created handlers")
 
 	for {

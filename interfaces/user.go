@@ -1,4 +1,4 @@
-package online
+package interfaces
 
 import (
 	"github.com/gorilla/websocket"
@@ -45,36 +45,42 @@ func (c *User) Listen() {
 
 func (u *User) listenWrite() {
 	log.Println("Listening write to user")
-	defer func() {
-		u.hub.unregister <- u
-		u.ws.Close()
-	}()
+	//defer func() {
+	//	u.hub.unregister <- u
+	//	u.ws.Close()
+	//}()
 
-	u.ws.SetReadLimit(maxMessageSize)
-	u.ws.SetReadDeadline(time.Now().Add(pongWait))
-	u.ws.SetPongHandler(func(string) error {
-		u.ws.SetReadDeadline(time.Now().Add(pongWait));
-		return nil
-	})
+	//u.ws.SetReadLimit(maxMessageSize)
+	//u.ws.SetReadDeadline(time.Now().Add(pongWait))
+	//u.ws.SetPongHandler(func(string) error {
+	//	u.ws.SetReadDeadline(time.Now().Add(pongWait));
+	//	return nil
+	//})
 
-	//for {
-	//	_, message, err := u.ws.ReadMessage()
-	//	if err != nil {
-	//		break
-	//	}
-	//
-	//	u.hub.broadcast <- string(message)
-	//}
+	for {
+		select {
+		case msg := <-u.ch:
+			//log.Println("Send:", msg, c.ws)
+
+			b, err := json.Marshal(msg)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			u.ws.WriteMessage(websocket.TextMessage, b)
+			//websocket.JSON.Send(c.ws, msg)
+		}
+	}
 }
 
 func (u *User) listenRead() {
 	log.Println("Listening read from client")
-	ticker := time.NewTicker(pingPeriod)
+	//ticker := time.NewTicker(pingPeriod)
 
-	defer func() {
-		ticker.Stop()
-		u.ws.Close()
-	}()
+	//defer func() {
+	//	ticker.Stop()
+	//	u.ws.Close()
+	//}()
 
 	for {
 		select {
@@ -87,32 +93,45 @@ func (u *User) listenRead() {
 		//		return
 		//	}
 
-		case <-u.doneCh:
-			u.hub.Unregister(u)
-			u.doneCh <- true // for listenWrite method
-			return
+		//case <-u.doneCh:
+		//	u.hub.Unregister(u)
+		//	u.doneCh <- true // for listenWrite method
+		//	return
 
-		case <-ticker.C:
-			if err := u.write(websocket.PingMessage, []byte{}); err != nil {
-				return
-			}
+		//case <-ticker.C:
+		//	if err := u.write(websocket.PingMessage, []byte{}); err != nil {
+		//		return
+		//	}
 
 		default:
 			_, message, err := u.ws.ReadMessage()
 
 			if err == io.EOF {
-				u.doneCh <- true
+				//u.doneCh <- true
 			} else if err != nil {
-				u.hub.Err(err)
+				//u.hub.Err(err)
 			}
 
 			var msg server.RequestMessage
 			err = json.Unmarshal(message, &msg)
-			if err != nil {
-				u.hub.Err(err)
-			}
+			//if err != nil {
+			//	u.hub.Err(err)
+			//}
 
 			switch msg.Action {
+			case initMessage:
+				log.Println(initMessage)
+				var message InitMessage
+				err := json.Unmarshal(msg.Body, &message)
+				if !server.CheckError(err, "Invalid RawData"+string(msg.Body), false) {
+					msg := server.ResponseMessage{Action: initMessage, Status: "Invalid Request", Code: 403}
+					u.ch <- msg
+				}
+
+				u.Id = message.UserId;
+				u.hub.register <- u
+				break;
+
 			case actionSendMessage:
 
 				log.Println(actionSendMessage)
@@ -123,17 +142,26 @@ func (u *User) listenRead() {
 					u.ch <- msg
 				}
 
-				dbMessage := domain.Message{0, message.DialogId, message.FromId, message.Text, 0}
-				dbMsg, err := u.hub.handler.Interator.NewMessage(dbMessage)
+				dbMessage := domain.Message{0, message.FromId, message.DialogId, message.Text, 0}
+				dbMsg, err := InteratorInstance.NewMessage(dbMessage)
 				if err != nil {
 					msg := server.ResponseMessage{Action: actionSendMessage, Status: "Invalid Request", Code: 403}
 					u.ch <- msg
 				}
 
-				addressee := u.hub.users[message.ToId]
-				if addressee == nil {
-					msg := server.ResponseMessage{Action: actionSendMessage, Status: "OK", Code: 200}
+				var sign bool;
+				addressee, sign := u.hub.users[message.ToId]
+				if !sign {
+					b, err := json.Marshal(dbMsg)
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
+					msg := server.ResponseMessage{Action: actionSendMessage, Status: "OK", Code: 200, Body: b}
 					u.ch <- msg
+					//msg := server.ResponseMessage{Action: actionSendMessage, Status: "OK", Code: 200}
+					//u.ch <- msg
+					break;
 				}
 
 				b, err := json.Marshal(dbMsg)
@@ -144,6 +172,8 @@ func (u *User) listenRead() {
 				msg := server.ResponseMessage{Action: actionSendMessage, Status: "OK", Code: 200, Body: b}
 
 				addressee.ch <- msg
+				u.ch <- msg
+
 
 				break;
 			}

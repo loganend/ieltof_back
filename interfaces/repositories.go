@@ -4,6 +4,8 @@ import (
 	"github.com/ieltof/domain"
 	"fmt"
 	"time"
+	"strconv"
+	"strings"
 )
 
 type DbHandler interface {
@@ -37,9 +39,6 @@ func (repo *DbUserRepo) NewUser(user domain.User) {
 }
 
 func (repo *DbUserRepo) GetUser(user domain.User) domain.User {
-
-
-	fmt.Println("GETUSER");
 	row := repo.dbHandler.Query(fmt.Sprintf("SELECT * FROM users WHERE fid = '%s' LIMIT 1", user.FacebookId))
 
 	var id uint32
@@ -54,6 +53,11 @@ func (repo *DbUserRepo) GetUser(user domain.User) domain.User {
 		fmt.Println(user)
 	} else {
 		repo.dbHandler.Execute(fmt.Sprintf("INSERT INTO users (fid, name, url) VALUES ('%s', '%s', '%s')", user.FacebookId, user.Name, user.Url))
+
+		row = repo.dbHandler.Query(fmt.Sprintf("SELECT * FROM users WHERE fid = '%s' LIMIT 1", user.FacebookId))
+		row.Next()
+		row.Scan(&id, &fid, &name, &url)
+		u = domain.User{Id: id, FacebookId: fid, Name: name, Url: url}
 	}
 
 	//var isAdmin string
@@ -83,6 +87,30 @@ func (repo *DbUserRepo) GetUsers() []domain.User {
 	return users;
 }
 
+func (repo *DbUserRepo) GetOnlineUsers(ids []uint32) []domain.User {
+	var values string = "("
+	for k := range ids {
+		values = values +  strconv.FormatInt(int64(ids[k]), 10) + ", "
+	}
+	values = values + "100)"
+
+	row := repo.dbHandler.Query(fmt.Sprintf("SELECT * FROM users WHERE id in " + values))
+	var id uint32
+	var fid string
+	var name string
+	var url string
+	var users []domain.User;
+	for row.Next() {
+		row.Scan(&id, &fid, &name, &url)
+		u := domain.User{Id: id, FacebookId: fid, Name: name, Url: url}
+		users = append(users, u)
+	}
+
+	return users;
+}
+
+//Friends
+
 func NewDbFriendRepo(dbHandlers map[string]DbHandler) *DbFriendRepo {
 	dbFriendRepo := new(DbFriendRepo)
 	dbFriendRepo.dbHandlers = dbHandlers
@@ -90,20 +118,55 @@ func NewDbFriendRepo(dbHandlers map[string]DbHandler) *DbFriendRepo {
 	return dbFriendRepo
 }
 
-func (repo *DbFriendRepo) GetFriends(userId int) []domain.Friend{
-	row := repo.dbHandler.Query(fmt.Sprintf("SELECT * FROM friends WHERE uid = '%d'", userId))
+func (repo *DbFriendRepo) GetFriends(userId uint32) []domain.Friend {
+	//row := repo.dbHandler.Query(fmt.Sprintf("SELECT * FROM friends WHERE uid = '%d' or fid = '%d'", userId, userId))
+	row := repo.dbHandler.Query(fmt.Sprintf("select t1.id, t1.uid, t1.fid, t1.apt, t2.uid as uid2, t2.text, t2.tmp, t3.id as id1, t3.name, t3.url, t4.id as id2, t4.name as name2, t4.url as url2 from friends as t1 "+
+		"join messages as t2 on t1.id =t2.did "+
+		"join users as t3 on t1.uid = t3.id "+
+		"join users as t4 on t1.fid = t4.id "+
+		"where t1.uid = '%d' or t1.fid = '%d'", userId, userId))
+
 	var id uint32
 	var uid uint32
 	var fid uint32
 	var apt bool
-	var friends []domain.Friend;
+
+	var mUid uint32
+	var text string
+	var timestamp int64
+	var id1 uint32
+	var id2 uint32
+	var name string
+	var url string
+	var name2 string
+	var url2 string
+	//var friends []domain.Friend;
+	friends := make(map[uint32]*domain.Friend)
+
 	for row.Next() {
-		row.Scan(&id, &uid, &fid, &apt)
-		f := domain.Friend{Id: id, Uid: uid, Fid: fid, Apt: apt}
-		friends = append(friends, f)
+		row.Scan(&id, &uid, &fid, &apt, &mUid, &text, &timestamp, &id1, &name, &url, &id2, &name2, &url2)
+		if friends[id] != nil {
+			m := domain.Message{Id: 0, UserId: mUid, DialogId: id, Text: text, Timestamp: timestamp}
+			friends[id].Messages = append(friends[id].Messages, m)
+		} else {
+			f := domain.Friend{Id: id, Uid: uid, Fid: fid, Apt: apt, Messages: nil, Name: name, Url: url}
+			friends[id] = &f
+			if (userId != id2) {
+				friends[id].Name = name2
+				friends[id].Url = url2
+			} else {
+				friends[id].Name = name
+				friends[id].Url = url
+			}
+		}
 	}
 
-	return friends;
+	var fds []domain.Friend;
+	for k := range friends {
+		fds = append(fds, *friends[k])
+	}
+
+	return fds;
 }
 
 func (repo *DbFriendRepo) FindById(id int) domain.Friend {
@@ -112,17 +175,33 @@ func (repo *DbFriendRepo) FindById(id int) domain.Friend {
 	return f;
 }
 
-func (repo *DbFriendRepo) FriendRequest(friendRequest domain.FriendRequest) bool{
+func (repo *DbFriendRepo) FriendRequest(friendRequest domain.FriendRequest) bool {
 
-		row := repo.dbHandler.Query(fmt.Sprintf("SELECT * FROM friends WHERE uid = '%d' AND fid = '%d'", friendRequest.FromId, friendRequest.ToId))
-		if 	row.Next() {
-			return false;
-		}
+	row := repo.dbHandler.Query(fmt.Sprintf("SELECT * FROM friends WHERE uid = '%d' AND fid = '%d'", friendRequest.FromId, friendRequest.ToId))
+	if row.Next() {
+		return false;
+	}
 
-		repo.dbHandler.Execute(fmt.Sprintf("INSERT INTO friends (uid, fid, apt) VALUES ('%d', '%d', '%t')",
+	repo.dbHandler.Execute(fmt.Sprintf("INSERT INTO friends (uid, fid, apt) VALUES ('%d', '%d', '%t')",
 		friendRequest.FromId, friendRequest.ToId, false))
-		return true
+	return true
 }
+
+func (repo *DbFriendRepo) AcceptFriendship(friend domain.Friend) bool {
+
+	repo.dbHandler.Execute(fmt.Sprintf("UPDATE friends SET apt = '%t' WHERE id = '%d'", true, friend.Id))
+
+	return true;
+}
+
+func (repo *DbFriendRepo) IgnoreFriendship(friend domain.Friend) bool {
+
+	repo.dbHandler.Execute(fmt.Sprintf("DELETE FROM friends WHERE id = '%d'", friend.Id))
+
+	return true;
+}
+
+//Messages
 
 func NewDbMessageRepo(dbHandlers map[string]DbHandler) *DbMessageRepo {
 	dbMessageRepo := new(DbMessageRepo)
@@ -133,7 +212,7 @@ func NewDbMessageRepo(dbHandlers map[string]DbHandler) *DbMessageRepo {
 
 func (repo *DbMessageRepo) InitMessage(friendRequest domain.FriendRequest) {
 
-	row := repo.dbHandler.Query(fmt.Sprintf("SELECT * FROM friends WHERE uid = '%d' LIMIT 1", friendRequest.FromId))
+	row := repo.dbHandler.Query(fmt.Sprintf("SELECT * FROM friends WHERE uid = '%d' AND fid = '%d' LIMIT 1", friendRequest.FromId, friendRequest.ToId))
 
 	var initMessage string = "Lets be friends"
 
@@ -151,8 +230,9 @@ func (repo *DbMessageRepo) InitMessage(friendRequest domain.FriendRequest) {
 
 func (repo *DbMessageRepo) NewMessage(message domain.Message) domain.Message {
 	message.Timestamp = time.Now().Unix()
+	message.Text = strings.Replace(message.Text, "'", "''", -1)
 	repo.dbHandler.Execute(fmt.Sprintf("INSERT INTO messages (uid, did, text, tmp) VALUES ('%d', '%d', '%s', '%d')",
-		message.Id, message.DialogId, message.Text, message.Timestamp))
+		message.UserId, message.DialogId, message.Text, message.Timestamp))
 	return message
 }
 

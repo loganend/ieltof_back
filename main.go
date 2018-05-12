@@ -12,9 +12,7 @@ import (
 	"github.com/ieltof/interfaces"
 	"github.com/ieltof/usecases"
 	"encoding/json"
-	"github.com/ieltof/online"
 )
-
 
 func main() {
 	log.SetFlags(log.Lshortfile)
@@ -40,12 +38,15 @@ func main() {
 
 	webserviceHandler := interfaces.WebserviceHandler{}
 	webserviceHandler.Interator = interator
+	interfaces.InteratorInstance = interator;
 	//webserviceHandler.UserInteractor = userInteractor
 	//webserviceHandler.FriendInteractor = friendInterator
 	//webserviceHandler.MessageInteractor = messageInterator
 
-	hub := online.NewHub(webserviceHandler);
+	hub := interfaces.NewHub();
+	interfaces.HubInstance = *hub;
 	go hub.Listen()
+
 
 	server := server.NewServer()
 	go server.Listen()
@@ -53,7 +54,8 @@ func main() {
 	 //static files
 	http.Handle("/", http.FileServer(http.Dir("webroot")))
 
-	log.Fatal(http.ListenAndServe(":8080", route.LoadHTTP(webserviceHandler)))
+	log.Fatal(http.ListenAndServe(":8080", route.LoadHTTP(webserviceHandler, hub, server)))
+
 }
 
 var config = &configuration{}

@@ -1,12 +1,10 @@
-package online
+package interfaces
 
 import (
 	"log"
 	"github.com/gorilla/websocket"
 	"time"
 	"net/http"
-	"github.com/ieltof/interfaces"
-	"github.com/ieltof/domain"
 )
 
 const (
@@ -22,10 +20,9 @@ type Hub struct {
 	unregister chan *User
 	doneCh     chan bool
 	errCh      chan error
-	handler    interfaces.WebserviceHandler
 }
 
-func NewHub(handler interfaces.WebserviceHandler) *Hub {
+func NewHub() *Hub {
 
 	users := make(map[uint32]*User)
 	register := make(chan *User)
@@ -39,24 +36,29 @@ func NewHub(handler interfaces.WebserviceHandler) *Hub {
 		unregister,
 		doneCh,
 		errCh,
-		handler,
 	}
 }
+
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  maxMessageSize,
 	WriteBufferSize: maxMessageSize,
+	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
 func (h *Hub) Unregister(u *User) {
 	h.unregister <- u
 }
 
+func (h *Hub) GetUsers() map[uint32]*User {
+	return h.users
+}
+
 func (s *Hub) Err(err error) {
 	s.errCh <- err
 }
 
-func (h *Hub) serveWs(res http.ResponseWriter, req *http.Request) {
+func (h *Hub) ServeWs(res http.ResponseWriter, req *http.Request) {
 	if req.Method != "GET" {
 		http.Error(res, "Method not allowed", 405)
 		return
@@ -68,30 +70,19 @@ func (h *Hub) serveWs(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	cookie, err := req.Cookie("facebookid")
-	var facebookId = cookie.Value
-	if err != nil {
-		log.Println(err)
-		return
-	}
 
-	var udb domain.User
-	udb.FacebookId = facebookId
-	u, err := h.handler.Interator.GetUser(udb);
-	if err != nil {
-		log.Println(err)
-		return
-	}
 
-	user := NewUser(h, ws, u.Id)
-	h.register <- user
+	//user := NewUser(h, ws, u.Id)
+	user := NewUser(h, ws, 0)
+
+	//h.register <- user
 	user.Listen()
 }
 
 func (h *Hub) Listen() {
 	log.Println("Listening Hub...")
 
-	http.HandleFunc("/api/v1/user", h.serveWs)
+	//http.HandleFunc("/api/v1/user", h.ServeWs)
 	log.Println("Created handlers")
 
 	for {
@@ -121,5 +112,4 @@ func (h *Hub) Listen() {
 			break
 		}
 	}
-
 }

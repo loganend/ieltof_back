@@ -4,7 +4,6 @@ DROP DATABASE IF EXISTS "ieltof";
 Create Database "ieltof";
 \connect ieltof
 
-
 CREATE TABLE "users" (
   "id" SERIAL PRIMARY KEY,
   "fid" text NOT NULL,
@@ -14,7 +13,7 @@ CREATE TABLE "users" (
 
 CREATE TABLE "friends" (
   "id" SERIAL PRIMARY KEY,
-  "uid" integer REFERENCES "users" (id),
+  "uid" integer REFERENCES "users" (id) ON DELETE CASCADE,
   "fid" integer NOT NULL,
   "apt" BOOLEAN
 );
@@ -22,7 +21,7 @@ CREATE TABLE "friends" (
 CREATE TABLE "messages" (
   "id" SERIAL PRIMARY KEY,
   "uid" integer REFERENCES "users" (id),
-  "did" integer REFERENCES "friends" (id),
+  "did" integer REFERENCES "friends" (id) ON DELETE CASCADE,
   "text" text,
   "tmp" BIGINT
 );

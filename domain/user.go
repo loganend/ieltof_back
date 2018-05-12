@@ -4,6 +4,7 @@ type UserRepository interface {
 	GetUser(User) User
 	NewUser(User)
 	GetUsers() []User
+	GetOnlineUsers([]uint32) []User
 }
 
 type User struct {
