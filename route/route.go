@@ -29,12 +29,12 @@ func routes(webserviceHandler interfaces.WebserviceHandler, hub *interfaces.Hub,
 	r.POST("/api2/friend",  hr.Handler(alice.New().ThenFunc(webserviceHandler.FriendRequest)))
 	r.GET("/api2/friends", hr.Handler(alice.New().ThenFunc(webserviceHandler.GetFriends)))
 
-	r.PUT("/api/friend/accept", hr.Handler(alice.New().ThenFunc(webserviceHandler.AcceptFriendship)))
-	r.DELETE("/api/friend/ignore", hr.Handler(alice.New().ThenFunc(webserviceHandler.IgnoreFriendship)))
+	r.PUT("/api2/friend/accept", hr.Handler(alice.New().ThenFunc(webserviceHandler.AcceptFriendship)))
+	r.DELETE("/api2/friend/ignore", hr.Handler(alice.New().ThenFunc(webserviceHandler.IgnoreFriendship)))
 
 
-	r.OPTIONS("/api/friend/accept", hr.Handler(alice.New().ThenFunc(webserviceHandler.OptionRequest)))
-	r.OPTIONS("/api/friend/ignore", hr.Handler(alice.New().ThenFunc(webserviceHandler.OptionRequest)))
+	r.OPTIONS("/api2/friend/accept", hr.Handler(alice.New().ThenFunc(webserviceHandler.OptionRequest)))
+	r.OPTIONS("/api2/friend/ignore", hr.Handler(alice.New().ThenFunc(webserviceHandler.OptionRequest)))
 	r.OPTIONS("/api2/friend", hr.Handler(alice.New().ThenFunc(webserviceHandler.OptionRequest)))
 
 	r.GET("/api/v1/user", hr.Handler(alice.New().ThenFunc(hub.ServeWs)))
